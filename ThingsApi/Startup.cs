@@ -17,6 +17,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using ThingsApi.Data;
 using ThingsApi.Models;
+using ThingsApi.Services;
 
 namespace ThingsApi
 {
@@ -35,6 +36,9 @@ namespace ThingsApi
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlite(Configuration.GetConnectionString("DefaultConnection")));
 
+            services.AddCors();
+            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+
             services.AddIdentity<ApplicationUser, IdentityRole>(x =>
             {
                 x.Password.RequireDigit = false;
@@ -47,7 +51,8 @@ namespace ThingsApi
             {
                 x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
                 x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            }).AddJwtBearer(x =>
+            })
+            .AddJwtBearer(x =>
             {
                 x.RequireHttpsMetadata = false;
                 x.SaveToken = true;
@@ -58,16 +63,15 @@ namespace ThingsApi
                         Encoding.ASCII.GetBytes(Configuration.GetValue<string>("JwtSigningKey"))
                     ),
                     ValidateAudience = false,
-                    ValidateIssuer = false,
-                    ValidateLifetime = true
+                    ValidateIssuer = false
                 };
             });
 
-            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+            services.AddScoped<IUserService, UserService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env, UserManager<ApplicationUser> userManager)
         {
             if (env.IsDevelopment())
             {
@@ -79,10 +83,13 @@ namespace ThingsApi
                 app.UseHsts();
             }
 
+            app.UseCors(x => x.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
             app.UseAuthentication();
-
             app.UseHttpsRedirection();
             app.UseMvc();
+
+            // Seeding
+            ApplicationDbSeeder.SeedUsers(userManager);
         }
     }
 }
